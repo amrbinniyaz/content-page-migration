@@ -4,40 +4,48 @@ import { useMigration } from '../context/MigrationContext'
 
 export default function PageSelectionPage({ onNext, onBack }) {
     const [searchQuery, setSearchQuery] = useState('')
-    const [filterType, setFilterType] = useState('all')
     const {
         discoveredPages,
         togglePageSelection,
         selectAllPages,
         scrapeAndAnalyze,
         isLoading,
-        sourceUrl
+        sourceUrl,
+        countSelectedPages,
+        countTotalPages
     } = useMigration()
 
-    const pageTypes = ['all', ...new Set(discoveredPages.map(p => p.type))]
-
-    const filteredPages = discoveredPages.filter(page => {
-        const matchesSearch = page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            page.url.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesType = filterType === 'all' || page.type === filterType
-        return matchesSearch && matchesType
-    })
-
-    const selectedCount = discoveredPages.filter(p => p.selected).length
-    const allSelected = filteredPages.length > 0 && filteredPages.every(p => p.selected)
+    const selectedCount = countSelectedPages()
+    const totalCount = countTotalPages()
+    const allSelected = selectedCount === totalCount && totalCount > 0
 
     const handleContinue = async () => {
         await scrapeAndAnalyze()
         onNext()
     }
 
+    const filterPages = (pages) => {
+        if (!searchQuery) return pages
+        return pages.filter(page => {
+            const matchesParent = page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                page.url.toLowerCase().includes(searchQuery.toLowerCase())
+            const matchesChildren = page.children?.some(child =>
+                child.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                child.url.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            return matchesParent || matchesChildren
+        })
+    }
+
+    const filteredPages = filterPages(discoveredPages)
+
     return (
-        <div className="max-w-4xl mx-auto animate-slide-up">
+        <div className="max-w-6xl mx-auto animate-slide-up">
             {/* Header */}
             <div className="text-center mb-8">
                 <h2 className="text-3xl font-bold text-gray-900 mb-2">Select pages to migrate</h2>
                 <p className="text-gray-500">
-                    Found <span className="font-semibold text-indigo-600">{discoveredPages.length}</span> pages on {sourceUrl}
+                    Found <span className="font-semibold text-indigo-600">{totalCount}</span> pages on {sourceUrl}
                 </p>
             </div>
 
@@ -50,7 +58,7 @@ export default function PageSelectionPage({ onNext, onBack }) {
                     </div>
                     <div className="h-10 w-px bg-gray-200"></div>
                     <div>
-                        <div className="text-2xl font-bold text-gray-900">{discoveredPages.length}</div>
+                        <div className="text-2xl font-bold text-gray-900">{totalCount}</div>
                         <div className="text-sm text-gray-500">Total Pages</div>
                     </div>
                 </div>
@@ -62,9 +70,9 @@ export default function PageSelectionPage({ onNext, onBack }) {
                 </button>
             </div>
 
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                <div className="flex-1 relative">
+            {/* Search */}
+            <div className="mb-6">
+                <div className="relative max-w-md">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
                         type="text"
@@ -74,51 +82,61 @@ export default function PageSelectionPage({ onNext, onBack }) {
                         className="w-full pl-12 pr-4 py-3.5 rounded-xl input-clean text-sm"
                     />
                 </div>
-
-                <select
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className="px-4 py-3.5 rounded-xl input-clean text-sm cursor-pointer min-w-[160px] font-medium"
-                >
-                    {pageTypes.map(type => (
-                        <option key={type} value={type}>
-                            {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </option>
-                    ))}
-                </select>
             </div>
 
-            {/* Page List */}
-            <div className="card overflow-hidden mb-8">
-                <div className="max-h-[400px] overflow-y-auto">
-                    {filteredPages.map((page, index) => (
-                        <div
-                            key={page.id}
-                            onClick={() => togglePageSelection(page.id)}
-                            className={`
-                flex items-center gap-4 px-5 py-4 cursor-pointer
-                transition-all duration-200 border-b border-gray-50 last:border-0
-                ${page.selected ? 'selected-item' : 'hover:bg-gray-50/50'}
-              `}
-                        >
-                            {/* Checkbox */}
-                            <div className={`
-                w-6 h-6 rounded-lg flex items-center justify-center transition-all duration-200
-                ${page.selected
-                                    ? 'checkbox-checked text-white'
-                                    : 'border-2 border-gray-200 hover:border-gray-300'
-                                }
-              `}>
-                                {page.selected && <Check className="w-4 h-4" strokeWidth={2.5} />}
+            {/* Sitemap Grid */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 mb-8">
+                <div className="text-center mb-10">
+                    <h3 className="text-2xl font-serif italic text-gray-800 tracking-wide">SITEMAP</h3>
+                    <div className="mt-3 w-16 h-0.5 bg-gradient-to-r from-orange-400 to-orange-600 mx-auto rounded-full"></div>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
+                    {filteredPages.map((page) => (
+                        <div key={page.id} className="space-y-3">
+                            {/* Parent Page */}
+                            <div
+                                onClick={() => togglePageSelection(page.id)}
+                                className="flex items-start gap-2.5 cursor-pointer group py-1"
+                            >
+                                <div className={`
+                                    w-4 h-4 mt-0.5 rounded-sm flex items-center justify-center flex-shrink-0 
+                                    transition-all duration-200 border
+                                    ${page.selected
+                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                        : 'border-gray-300 bg-white group-hover:border-indigo-400 group-hover:bg-indigo-50'
+                                    }
+                                `}>
+                                    {page.selected && <Check className="w-3 h-3" strokeWidth={3} />}
+                                </div>
+                                <span className="font-semibold text-orange-600 group-hover:text-orange-700 transition-colors text-sm leading-tight">
+                                    {page.title}
+                                </span>
                             </div>
 
-                            {/* Page Info */}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="font-medium text-gray-900 truncate">{page.title}</h3>
-                                    <span className="badge flex-shrink-0">{page.type}</span>
-                                </div>
-                                <p className="text-sm text-gray-400 truncate mt-0.5">{page.url}</p>
+                            {/* Children Pages */}
+                            <div className="space-y-2 ml-1 border-l-2 border-gray-100 pl-4">
+                                {page.children?.map((child) => (
+                                    <div
+                                        key={child.id}
+                                        onClick={() => togglePageSelection(child.id, true, page.id)}
+                                        className="flex items-start gap-2.5 cursor-pointer group py-0.5"
+                                    >
+                                        <div className={`
+                                            w-4 h-4 mt-0.5 rounded-sm flex items-center justify-center flex-shrink-0 
+                                            transition-all duration-200 border
+                                            ${child.selected
+                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                                : 'border-gray-300 bg-white group-hover:border-indigo-400 group-hover:bg-indigo-50'
+                                            }
+                                        `}>
+                                            {child.selected && <Check className="w-3 h-3" strokeWidth={3} />}
+                                        </div>
+                                        <span className="text-gray-600 group-hover:text-gray-900 transition-colors text-sm leading-tight">
+                                            {child.title}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ))}
@@ -139,9 +157,9 @@ export default function PageSelectionPage({ onNext, onBack }) {
                     onClick={handleContinue}
                     disabled={selectedCount === 0 || isLoading}
                     className={`
-            flex items-center gap-2 px-8 py-3 rounded-xl btn-primary text-sm
-            ${(selectedCount === 0 || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}
-          `}
+                        flex items-center gap-2 px-8 py-3 rounded-xl btn-primary text-sm
+                        ${(selectedCount === 0 || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
                 >
                     {isLoading ? (
                         <>

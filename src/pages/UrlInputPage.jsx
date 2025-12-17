@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, Loader2, Globe, Sparkles, FileSearch, Download } from 'lucide-react'
+import { ArrowRight, Loader2, Globe, Sparkles } from 'lucide-react'
 import { useMigration } from '../context/MigrationContext'
 
 export default function UrlInputPage({ onNext }) {
@@ -38,27 +38,6 @@ export default function UrlInputPage({ onNext }) {
         await discoverPages(normalizedUrl)
         onNext()
     }
-
-    const features = [
-        {
-            icon: FileSearch,
-            title: 'Smart Discovery',
-            desc: 'Automatically finds all pages via sitemap analysis',
-            color: 'from-blue-500 to-cyan-500'
-        },
-        {
-            icon: Sparkles,
-            title: 'AI Analysis',
-            desc: 'Rates SEO, readability & accessibility with AI',
-            color: 'from-indigo-500 to-purple-500'
-        },
-        {
-            icon: Download,
-            title: 'Easy Export',
-            desc: 'Export content in CMS-ready JSON format',
-            color: 'from-purple-500 to-pink-500'
-        },
-    ]
 
     return (
         <div className="max-w-2xl mx-auto pt-8 animate-slide-up">
@@ -129,21 +108,6 @@ export default function UrlInputPage({ onNext }) {
                 </p>
             </div>
 
-            {/* Features Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {features.map((feature) => (
-                    <div key={feature.title} className="feature-card p-5 text-center">
-                        <div className={`
-              w-12 h-12 rounded-2xl mx-auto mb-4 flex items-center justify-center
-              bg-gradient-to-br ${feature.color} shadow-lg
-            `}>
-                            <feature.icon className="w-6 h-6 text-white" />
-                        </div>
-                        <h3 className="font-semibold text-gray-900 mb-1">{feature.title}</h3>
-                        <p className="text-sm text-gray-500 leading-relaxed">{feature.desc}</p>
-                    </div>
-                ))}
-            </div>
         </div>
     )
 }

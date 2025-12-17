@@ -2,20 +2,116 @@ import { createContext, useContext, useState } from 'react'
 
 const MigrationContext = createContext()
 
-// Mock data for prototype
+// Mock data for prototype - nested hierarchical structure
 const mockDiscoveredPages = [
-    { id: 1, url: '/home', title: 'Home', type: 'homepage', selected: true },
-    { id: 2, url: '/about', title: 'About Us', type: 'content', selected: true },
-    { id: 3, url: '/admissions', title: 'Admissions', type: 'content', selected: true },
-    { id: 4, url: '/academics', title: 'Academics', type: 'content', selected: true },
-    { id: 5, url: '/athletics', title: 'Athletics', type: 'content', selected: false },
-    { id: 6, url: '/arts', title: 'Arts & Culture', type: 'content', selected: true },
-    { id: 7, url: '/news', title: 'News & Events', type: 'blog', selected: true },
-    { id: 8, url: '/contact', title: 'Contact Us', type: 'contact', selected: true },
-    { id: 9, url: '/calendar', title: 'School Calendar', type: 'content', selected: false },
-    { id: 10, url: '/faculty', title: 'Faculty & Staff', type: 'content', selected: true },
-    { id: 11, url: '/parents', title: 'Parent Portal', type: 'content', selected: false },
-    { id: 12, url: '/students', title: 'Student Life', type: 'content', selected: true },
+    {
+        id: 1,
+        url: '/about',
+        title: 'About Us',
+        type: 'content',
+        selected: false,
+        isParent: true,
+        children: [
+            { id: 101, url: '/about/history', title: 'Our History', type: 'content', selected: false },
+            { id: 102, url: '/about/mission', title: 'Mission & Vision', type: 'content', selected: false },
+            { id: 103, url: '/about/leadership', title: 'Leadership Team', type: 'content', selected: false },
+            { id: 104, url: '/about/accreditation', title: 'Accreditation', type: 'content', selected: false },
+        ]
+    },
+    {
+        id: 2,
+        url: '/academics',
+        title: 'Academics',
+        type: 'content',
+        selected: false,
+        isParent: true,
+        children: [
+            { id: 201, url: '/academics/elementary', title: 'Elementary School', type: 'content', selected: false },
+            { id: 202, url: '/academics/middle', title: 'Middle School', type: 'content', selected: false },
+            { id: 203, url: '/academics/high', title: 'High School', type: 'content', selected: false },
+            { id: 204, url: '/academics/curriculum', title: 'Curriculum', type: 'content', selected: false },
+            { id: 205, url: '/academics/honors', title: 'Honors Program', type: 'content', selected: false },
+        ]
+    },
+    {
+        id: 3,
+        url: '/admissions',
+        title: 'Admissions',
+        type: 'content',
+        selected: false,
+        isParent: true,
+        children: [
+            { id: 301, url: '/admissions/apply', title: 'How to Apply', type: 'content', selected: false },
+            { id: 302, url: '/admissions/tuition', title: 'Tuition & Fees', type: 'content', selected: false },
+            { id: 303, url: '/admissions/financial-aid', title: 'Financial Aid', type: 'content', selected: false },
+            { id: 304, url: '/admissions/visit', title: 'Schedule a Visit', type: 'content', selected: false },
+        ]
+    },
+    {
+        id: 4,
+        url: '/student-life',
+        title: 'Student Life',
+        type: 'content',
+        selected: false,
+        isParent: true,
+        children: [
+            { id: 401, url: '/student-life/athletics', title: 'Athletics', type: 'content', selected: false },
+            { id: 402, url: '/student-life/arts', title: 'Arts & Culture', type: 'content', selected: false },
+            { id: 403, url: '/student-life/clubs', title: 'Clubs & Organizations', type: 'content', selected: false },
+            { id: 404, url: '/student-life/events', title: 'Events Calendar', type: 'content', selected: false },
+        ]
+    },
+    {
+        id: 5,
+        url: '/news',
+        title: 'News & Media',
+        type: 'blog',
+        selected: false,
+        isParent: true,
+        children: [
+            { id: 501, url: '/news/announcements', title: 'Announcements', type: 'blog', selected: false },
+            { id: 502, url: '/news/stories', title: 'Stories', type: 'blog', selected: false },
+            { id: 503, url: '/news/press', title: 'Press Releases', type: 'blog', selected: false },
+        ]
+    },
+    {
+        id: 6,
+        url: '/community',
+        title: 'Community',
+        type: 'content',
+        selected: false,
+        isParent: true,
+        children: [
+            { id: 601, url: '/community/parents', title: 'Parent Portal', type: 'content', selected: false },
+            { id: 602, url: '/community/alumni', title: 'Alumni', type: 'content', selected: false },
+            { id: 603, url: '/community/giving', title: 'Support & Giving', type: 'content', selected: false },
+        ]
+    },
+    {
+        id: 7,
+        url: '/contact',
+        title: 'Contact',
+        type: 'contact',
+        selected: false,
+        isParent: true,
+        children: [
+            { id: 701, url: '/contact/directory', title: 'Staff Directory', type: 'contact', selected: false },
+            { id: 702, url: '/contact/locations', title: 'Locations', type: 'contact', selected: false },
+        ]
+    },
+    {
+        id: 8,
+        url: '/resources',
+        title: 'Resources',
+        type: 'content',
+        selected: false,
+        isParent: true,
+        children: [
+            { id: 801, url: '/resources/forms', title: 'Forms & Documents', type: 'content', selected: false },
+            { id: 802, url: '/resources/faq', title: 'FAQ', type: 'content', selected: false },
+            { id: 803, url: '/resources/policies', title: 'Policies', type: 'content', selected: false },
+        ]
+    },
 ]
 
 const mockScrapedContent = {
@@ -110,18 +206,58 @@ export function MigrationProvider({ children }) {
         setIsLoading(false)
     }
 
-    const togglePageSelection = (pageId) => {
+    const togglePageSelection = (pageId, isChild = false, parentId = null) => {
         setDiscoveredPages(pages =>
-            pages.map(page =>
-                page.id === pageId ? { ...page, selected: !page.selected } : page
-            )
+            pages.map(page => {
+                if (isChild && page.id === parentId) {
+                    return {
+                        ...page,
+                        children: page.children?.map(child =>
+                            child.id === pageId ? { ...child, selected: !child.selected } : child
+                        )
+                    }
+                }
+                if (!isChild && page.id === pageId) {
+                    const newSelected = !page.selected
+                    return {
+                        ...page,
+                        selected: newSelected,
+                        children: page.children?.map(child => ({ ...child, selected: newSelected }))
+                    }
+                }
+                return page
+            })
         )
     }
 
     const selectAllPages = (selected) => {
         setDiscoveredPages(pages =>
-            pages.map(page => ({ ...page, selected }))
+            pages.map(page => ({
+                ...page,
+                selected,
+                children: page.children?.map(child => ({ ...child, selected }))
+            }))
         )
+    }
+
+    const countSelectedPages = () => {
+        let count = 0
+        discoveredPages.forEach(page => {
+            if (page.selected) count++
+            page.children?.forEach(child => {
+                if (child.selected) count++
+            })
+        })
+        return count
+    }
+
+    const countTotalPages = () => {
+        let count = 0
+        discoveredPages.forEach(page => {
+            count++
+            count += page.children?.length || 0
+        })
+        return count
     }
 
     const toggleUseOriginal = (pageId) => {
@@ -167,6 +303,8 @@ export function MigrationProvider({ children }) {
             toggleUseOriginal,
             getSelectedPages,
             generateExport,
+            countSelectedPages,
+            countTotalPages,
         }}>
             {children}
         </MigrationContext.Provider>
