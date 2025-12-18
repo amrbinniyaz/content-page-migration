@@ -2,7 +2,9 @@ import { createContext, useContext, useState } from 'react'
 
 const MigrationContext = createContext()
 
-// Mock data for prototype - nested hierarchical structure
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+
+// Mock data for prototype - nested hierarchical structure (fallback)
 const mockDiscoveredPages = [
     {
         id: 1,
@@ -188,21 +190,190 @@ export function MigrationProvider({ children }) {
     const [discoveredPages, setDiscoveredPages] = useState([])
     const [scrapedContent, setScrapedContent] = useState({})
     const [isLoading, setIsLoading] = useState(false)
+    const [discoveryProgress, setDiscoveryProgress] = useState({
+        phase: 'discovering',
+        urlsFound: 0,
+        processed: 0,
+        queue: 0,
+        total: 0,
+        currentAction: ''
+    })
 
     const discoverPages = async (url) => {
         setIsLoading(true)
         setSourceUrl(url)
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setDiscoveredPages(mockDiscoveredPages)
+        setDiscoveryProgress({ phase: 'discovering', urlsFound: 0, processed: 0, queue: 0, total: 0, currentAction: 'Connecting...' })
+        
+        try {
+            // Use SSE for real-time progress
+            const eventSource = new EventSource(`${API_BASE}/discover/stream?url=${encodeURIComponent(url)}`)
+            
+            await new Promise((resolve, reject) => {
+                eventSource.onmessage = (event) => {
+                    const data = JSON.parse(event.data)
+                    
+                    if (data.type === 'progress') {
+                        setDiscoveryProgress({
+                            phase: data.phase || 'discovering',
+                            urlsFound: data.urlsFound || 0,
+                            processed: data.processed || 0,
+                            queue: data.queue || 0,
+                            total: data.total || 0,
+                            currentAction: data.currentAction || ''
+                        })
+                    } else if (data.type === 'complete') {
+                        eventSource.close()
+                        if (data.pages) {
+                            const pagesWithSelection = data.pages.map(page => ({
+                                ...page,
+                                selected: false,
+                                children: page.children?.map(child => ({ ...child, selected: false })) || []
+                            }))
+                            setDiscoveredPages(pagesWithSelection)
+                        }
+                        resolve()
+                    } else if (data.type === 'error') {
+                        eventSource.close()
+                        console.error('Discovery error:', data.error)
+                        setDiscoveredPages(mockDiscoveredPages)
+                        resolve()
+                    }
+                }
+                
+                eventSource.onerror = () => {
+                    eventSource.close()
+                    console.error('SSE connection failed, using fallback')
+                    setDiscoveredPages(mockDiscoveredPages)
+                    resolve()
+                }
+            })
+        } catch (error) {
+            console.error('API Error:', error)
+            setDiscoveredPages(mockDiscoveredPages)
+        }
+        
         setIsLoading(false)
+    }
+
+    // Helper function to analyze content with AI
+    const analyzeWithAI = async (pageContent, pageTitle) => {
+        try {
+            console.log(`🤖 [AI] Starting analysis for: ${pageTitle}`)
+
+            const contentToAnalyze = `
+Title: ${pageContent.title || ''}
+Meta Description: ${pageContent.metaDescription || ''}
+H1: ${pageContent.h1 || ''}
+Content: ${pageContent.bodyContent || ''}
+            `.trim()
+
+            const response = await fetch(`${API_BASE}/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: contentToAnalyze })
+            })
+
+            if (!response.ok) {
+                throw new Error('AI analysis failed')
+            }
+
+            const data = await response.json()
+
+            if (data.success) {
+                console.log(`✅ [AI] Analysis complete for: ${pageTitle}`, data.analysis)
+                return data.analysis
+            }
+            return null
+        } catch (error) {
+            console.error(`❌ [AI] Analysis Error for ${pageTitle}:`, error)
+            return null
+        }
     }
 
     const scrapeAndAnalyze = async () => {
         setIsLoading(true)
-        // Simulate scraping and AI analysis
-        await new Promise(resolve => setTimeout(resolve, 3000))
-        setScrapedContent(mockScrapedContent)
+
+        // Collect all pages to analyze
+        const pagesToAnalyze = []
+
+        discoveredPages.forEach(page => {
+            if (page.selected && page.content) {
+                pagesToAnalyze.push({ id: page.id, content: page.content, title: page.title })
+            }
+            page.children?.forEach(child => {
+                if (child.selected && child.content) {
+                    pagesToAnalyze.push({ id: child.id, content: child.content, title: child.title })
+                }
+            })
+        })
+
+        // If no pages to analyze, fallback to mock
+        if (pagesToAnalyze.length === 0) {
+            console.log('⚠️ No pages selected, using mock data')
+            setScrapedContent(mockScrapedContent)
+            setIsLoading(false)
+            return
+        }
+
+        console.log(`🚀 [AI] Starting AI analysis for ${pagesToAnalyze.length} pages...`)
+
+        // Build initial content and analyze with AI
+        const content = {}
+
+        // Process pages in batches to avoid overwhelming the API
+        const batchSize = 3
+        for (let i = 0; i < pagesToAnalyze.length; i += batchSize) {
+            const batch = pagesToAnalyze.slice(i, i + batchSize)
+
+            await Promise.all(batch.map(async (page) => {
+                const originalTitle = page.content.title || page.title
+                const originalMeta = page.content.metaDescription || ''
+                const originalBody = page.content.bodyContent || ''
+
+                // Call AI for analysis
+                const aiAnalysis = await analyzeWithAI(page.content, page.title)
+
+                content[page.id] = {
+                    original: {
+                        title: originalTitle,
+                        metaDescription: originalMeta,
+                        h1: page.content.h1 || '',
+                        bodyContent: originalBody,
+                        images: page.content.images || [],
+                        wordCount: page.content.wordCount || 0
+                    },
+                    analysis: aiAnalysis ? {
+                        seo: aiAnalysis.seo || { score: 5, issues: [] },
+                        readability: aiAnalysis.readability || { score: 5, issues: [] },
+                        accessibility: aiAnalysis.accessibility || { score: 5, issues: [] },
+                        overall: aiAnalysis.seo && aiAnalysis.readability && aiAnalysis.accessibility
+                            ? ((aiAnalysis.seo.score + aiAnalysis.readability.score + aiAnalysis.accessibility.score) / 3).toFixed(1)
+                            : 5
+                    } : {
+                        seo: { score: 5, issues: ['AI analysis unavailable'] },
+                        readability: { score: 5, issues: ['AI analysis unavailable'] },
+                        accessibility: { score: 5, issues: ['AI analysis unavailable'] },
+                        overall: 5
+                    },
+                    improved: aiAnalysis?.improved ? {
+                        title: aiAnalysis.improved.title || `${originalTitle} | Optimized`,
+                        metaDescription: aiAnalysis.improved.metaDescription || originalMeta,
+                        bodyContent: aiAnalysis.improved.bodyContent || originalBody,
+                        keywords: aiAnalysis.improved.keywords || []
+                    } : {
+                        title: `${originalTitle} | Optimized`,
+                        metaDescription: originalMeta || 'AI analysis unavailable',
+                        bodyContent: originalBody,
+                        keywords: []
+                    },
+                    useOriginal: false // Default to AI improved version
+                }
+            }))
+
+            // Update state progressively so user sees results as they come
+            setScrapedContent({ ...content })
+        }
+
         setIsLoading(false)
     }
 
@@ -296,6 +467,7 @@ export function MigrationProvider({ children }) {
             discoveredPages,
             scrapedContent,
             isLoading,
+            discoveryProgress,
             discoverPages,
             scrapeAndAnalyze,
             togglePageSelection,

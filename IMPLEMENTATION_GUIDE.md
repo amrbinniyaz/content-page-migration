@@ -51,79 +51,72 @@ This document outlines how to transform the current prototype into a production-
 
 ### 1. Sitemap Discovery Response
 
-When your scraper discovers pages from a sitemap, return this structure:
+When your scraper discovers pages from a sitemap, return **an array** with this structure:
 
 ```json
-{
-  "success": true,
-  "data": {
-    "sourceUrl": "https://example.com",
-    "discoveredAt": "2025-12-17T11:27:00Z",
-    "totalPages": 36,
-    "pages": [
-      {
-        "id": "about",
-        "url": "/about",
-        "fullUrl": "https://example.com/about",
-        "title": "About Us",
-        "type": "content",
-        "selected": false,
-        "isParent": true,
-        "children": [
-          {
-            "id": "about-history",
-            "url": "/about/history",
-            "fullUrl": "https://example.com/about/history",
-            "title": "Our History",
-            "type": "content",
-            "selected": false
-          },
-          {
-            "id": "about-mission",
-            "url": "/about/mission",
-            "fullUrl": "https://example.com/about/mission",
-            "title": "Mission & Vision",
-            "type": "content",
-            "selected": false
-          }
-        ]
-      },
-      {
-        "id": "academics",
-        "url": "/academics",
-        "fullUrl": "https://example.com/academics",
-        "title": "Academics",
-        "type": "content",
-        "selected": false,
-        "isParent": true,
-        "children": [
-          {
-            "id": "academics-elementary",
-            "url": "/academics/elementary",
-            "fullUrl": "https://example.com/academics/elementary",
-            "title": "Elementary School",
-            "type": "content",
-            "selected": false
-          }
-        ]
-      }
+[
+  {
+    "id": 1,
+    "url": "/about",
+    "title": "About Us",
+    "type": "content",
+    "isParent": true,
+    "children": [
+      { "id": 101, "url": "/about/history", "title": "Our History", "type": "content" },
+      { "id": 102, "url": "/about/mission", "title": "Mission & Vision", "type": "content" },
+      { "id": 103, "url": "/about/leadership", "title": "Leadership Team", "type": "content" }
+    ]
+  },
+  {
+    "id": 2,
+    "url": "/academics",
+    "title": "Academics",
+    "type": "content",
+    "isParent": true,
+    "children": [
+      { "id": 201, "url": "/academics/elementary", "title": "Elementary School", "type": "content" },
+      { "id": 202, "url": "/academics/middle", "title": "Middle School", "type": "content" },
+      { "id": 203, "url": "/academics/high", "title": "High School", "type": "content" }
+    ]
+  },
+  {
+    "id": 3,
+    "url": "/contact",
+    "title": "Contact",
+    "type": "contact",
+    "isParent": true,
+    "children": [
+      { "id": 301, "url": "/contact/directory", "title": "Staff Directory", "type": "contact" },
+      { "id": 302, "url": "/contact/locations", "title": "Locations", "type": "contact" }
     ]
   }
-}
+]
 ```
 
 #### Field Descriptions
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Unique identifier (slug-based) |
-| `url` | string | Relative path from root |
-| `fullUrl` | string | Complete URL |
-| `title` | string | Page title (from `<title>` or `<h1>`) |
-| `type` | string | Page type: `homepage`, `content`, `blog`, `contact` |
-| `selected` | boolean | Whether user selected this page (default: false) |
-| `isParent` | boolean | Whether this is a parent/section page |
-| `children` | array | Child pages under this section |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | number | Yes | Unique numeric identifier. Parent IDs: 1, 2, 3... Child IDs: 101, 102 (prefix with parent ID) |
+| `url` | string | Yes | Relative path from root (e.g., `/about`, `/about/history`) |
+| `title` | string | Yes | Page title extracted from `<title>` tag or `<h1>` |
+| `type` | string | Yes | One of: `homepage`, `content`, `blog`, `contact` |
+| `isParent` | boolean | Only on parents | Set to `true` for top-level section pages that have children |
+| `children` | array | Only on parents | Array of child page objects (same structure, without `isParent` or `children`) |
+
+#### ID Numbering Convention
+
+- **Parent pages**: Sequential integers (1, 2, 3, 4...)
+- **Child pages**: Parent ID × 100 + sequence (101, 102, 103 for parent 1's children)
+
+#### Type Detection
+
+| URL Pattern | Type |
+|-------------|------|
+| `/`, `/home` | `homepage` |
+| `/blog/*`, `/news/*`, `/articles/*` | `blog` |
+| `/contact/*` | `contact` |
+| Everything else | `content` |
 
 #### How to Build Hierarchy from Flat URLs
 
@@ -138,6 +131,7 @@ function buildHierarchy(urls, baseUrl) {
 
   // Group by first segment
   const groups = {};
+  let parentId = 1;
   
   paths.forEach(path => {
     const segments = path.split('/').filter(Boolean);
@@ -145,26 +139,24 @@ function buildHierarchy(urls, baseUrl) {
     
     if (!groups[parentKey]) {
       groups[parentKey] = {
-        id: parentKey,
+        id: parentId,
         url: `/${parentKey}`,
-        fullUrl: `${baseUrl}/${parentKey}`,
         title: formatTitle(parentKey),
         type: detectType(parentKey),
-        selected: false,
         isParent: true,
         children: []
       };
+      parentId++;
     }
     
     if (segments.length > 1) {
-      const childId = segments.join('-');
-      groups[parentKey].children.push({
+      const parent = groups[parentKey];
+      const childId = parent.id * 100 + parent.children.length + 1;
+      parent.children.push({
         id: childId,
-        url: path,
-        fullUrl: `${baseUrl}${path}`,
+        url: path.startsWith('/') ? path : `/${path}`,
         title: formatTitle(segments[segments.length - 1]),
-        type: 'content',
-        selected: false
+        type: detectType(parentKey)
       });
     }
   });
