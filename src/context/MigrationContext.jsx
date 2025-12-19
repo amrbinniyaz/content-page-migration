@@ -290,22 +290,24 @@ Content: ${pageContent.bodyContent || ''}
         }
     }
 
+    // Recursive helper to collect all selected pages with content at any depth
+    const collectSelectedPages = (pages, result = []) => {
+        pages.forEach(page => {
+            if (page.selected && page.content) {
+                result.push({ id: page.id, content: page.content, title: page.title })
+            }
+            if (page.children?.length > 0) {
+                collectSelectedPages(page.children, result)
+            }
+        })
+        return result
+    }
+
     const scrapeAndAnalyze = async () => {
         setIsLoading(true)
 
-        // Collect all pages to analyze
-        const pagesToAnalyze = []
-
-        discoveredPages.forEach(page => {
-            if (page.selected && page.content) {
-                pagesToAnalyze.push({ id: page.id, content: page.content, title: page.title })
-            }
-            page.children?.forEach(child => {
-                if (child.selected && child.content) {
-                    pagesToAnalyze.push({ id: child.id, content: child.content, title: child.title })
-                }
-            })
-        })
+        // Collect all pages to analyze (recursively)
+        const pagesToAnalyze = collectSelectedPages(discoveredPages)
 
         // If no pages to analyze, fallback to mock
         if (pagesToAnalyze.length === 0) {
@@ -398,58 +400,74 @@ Content: ${pageContent.bodyContent || ''}
         setIsLoading(false)
     }
 
+    // Recursive helper to toggle selection in nested structure
+    const toggleSelectionRecursive = (pages, pageId, newSelectedValue = null) => {
+        return pages.map(page => {
+            if (page.id === pageId) {
+                const newSelected = newSelectedValue !== null ? newSelectedValue : !page.selected
+                return {
+                    ...page,
+                    selected: newSelected,
+                    children: page.children ? setAllChildrenSelected(page.children, newSelected) : []
+                }
+            }
+            if (page.children?.length > 0) {
+                return {
+                    ...page,
+                    children: toggleSelectionRecursive(page.children, pageId, newSelectedValue)
+                }
+            }
+            return page
+        })
+    }
+
+    // Helper to set all children (and their children) to selected state
+    const setAllChildrenSelected = (children, selected) => {
+        return children.map(child => ({
+            ...child,
+            selected,
+            children: child.children ? setAllChildrenSelected(child.children, selected) : []
+        }))
+    }
+
     const togglePageSelection = (pageId, isChild = false, parentId = null) => {
-        setDiscoveredPages(pages =>
-            pages.map(page => {
-                if (isChild && page.id === parentId) {
-                    return {
-                        ...page,
-                        children: page.children?.map(child =>
-                            child.id === pageId ? { ...child, selected: !child.selected } : child
-                        )
-                    }
-                }
-                if (!isChild && page.id === pageId) {
-                    const newSelected = !page.selected
-                    return {
-                        ...page,
-                        selected: newSelected,
-                        children: page.children?.map(child => ({ ...child, selected: newSelected }))
-                    }
-                }
-                return page
-            })
-        )
+        setDiscoveredPages(pages => toggleSelectionRecursive(pages, pageId))
     }
 
     const selectAllPages = (selected) => {
-        setDiscoveredPages(pages =>
-            pages.map(page => ({
-                ...page,
-                selected,
-                children: page.children?.map(child => ({ ...child, selected }))
-            }))
-        )
+        setDiscoveredPages(pages => setAllChildrenSelected(pages, selected))
+    }
+
+    // Recursive count of selected pages
+    const countSelectedPagesRecursive = (pages) => {
+        let count = 0
+        pages.forEach(page => {
+            if (page.selected) count++
+            if (page.children?.length > 0) {
+                count += countSelectedPagesRecursive(page.children)
+            }
+        })
+        return count
     }
 
     const countSelectedPages = () => {
+        return countSelectedPagesRecursive(discoveredPages)
+    }
+
+    // Recursive count of total pages
+    const countTotalPagesRecursive = (pages) => {
         let count = 0
-        discoveredPages.forEach(page => {
-            if (page.selected) count++
-            page.children?.forEach(child => {
-                if (child.selected) count++
-            })
+        pages.forEach(page => {
+            count++
+            if (page.children?.length > 0) {
+                count += countTotalPagesRecursive(page.children)
+            }
         })
         return count
     }
 
     const countTotalPages = () => {
-        let count = 0
-        discoveredPages.forEach(page => {
-            count++
-            count += page.children?.length || 0
-        })
-        return count
+        return countTotalPagesRecursive(discoveredPages)
     }
 
     const toggleUseOriginal = (pageId) => {
@@ -462,7 +480,20 @@ Content: ${pageContent.bodyContent || ''}
         }))
     }
 
-    const getSelectedPages = () => discoveredPages.filter(p => p.selected)
+    // Recursive helper to get all selected pages at any depth
+    const getSelectedPagesRecursive = (pages, result = []) => {
+        pages.forEach(page => {
+            if (page.selected) {
+                result.push(page)
+            }
+            if (page.children?.length > 0) {
+                getSelectedPagesRecursive(page.children, result)
+            }
+        })
+        return result
+    }
+
+    const getSelectedPages = () => getSelectedPagesRecursive(discoveredPages)
 
     const generateExport = () => {
         const selectedPages = getSelectedPages()
