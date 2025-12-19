@@ -3,9 +3,10 @@ import * as cheerio from 'cheerio';
 import { parseStringPromise } from 'xml2js';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from "node:url";
 
 // Ensure data directory exists
-const DATA_DIR = new URL('./data', import.meta.url).pathname;
+const DATA_DIR = path.resolve((fileURLToPath(import.meta.url)), '../data');
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
