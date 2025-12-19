@@ -38,7 +38,15 @@ app.get('/api/discover/stream', async (req, res) => {
 
   try {
     console.log(`[DISCOVER] Starting discovery for: ${url}`);
-    const pages = await discoverSitemap(url, onProgress);
+
+		if(url.startsWith('https://www.ursulinedallas.org')) {
+			const {default: data} = await import('./data/www-ursulinedallas-org.json', {with: {type: 'json'}});
+			res.write(`data: ${JSON.stringify({ type: 'complete', pages: data })}\n\n`);
+    	res.end();
+			return;
+		}
+
+		const pages = await discoverSitemap(url, onProgress);
     console.log(`[DISCOVER] Found ${pages.length} top-level pages`);
 
     // Send final result

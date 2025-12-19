@@ -27,3 +27,4 @@ npm-debug.log*
 
 # Scraped data
 server/data/
+!server/data/www-ursulinedallas-org.json
