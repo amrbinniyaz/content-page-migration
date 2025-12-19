@@ -29,6 +29,25 @@ function saveToJson(baseUrl, pages) {
   return filepath;
 }
 
+// Save analyzed data to JSON file
+export function saveAnalyzedData(sourceUrl, analyzedContent) {
+  const domain = new URL(sourceUrl).hostname.replace(/\./g, '-');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const filename = `${domain}_${timestamp}_analyzed.json`;
+  const filepath = path.join(DATA_DIR, filename);
+  
+  const data = {
+    sourceUrl,
+    analyzedAt: new Date().toISOString(),
+    totalPages: Object.keys(analyzedContent).length,
+    content: analyzedContent
+  };
+  
+  fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
+  console.log(`[SAVE] Analyzed data saved to ${filepath}`);
+  return { filepath, filename };
+}
+
 // Count pages in result
 function countPagesInResult(pages) {
   let count = 0;

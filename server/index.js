@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { discoverSitemap, scrapePages } from './scraper.js';
+import { discoverSitemap, scrapePages, saveAnalyzedData } from './scraper.js';
 import { analyzeContent } from './ai.js';
 
 const app = express();
@@ -112,9 +112,32 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
+// Save analyzed content to JSON file
+app.post('/api/save-analysis', async (req, res) => {
+  try {
+    const { sourceUrl, analyzedContent } = req.body;
+
+    if (!sourceUrl || !analyzedContent) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'sourceUrl and analyzedContent are required' 
+      });
+    }
+
+    console.log(`[SAVE] Saving analyzed data for: ${sourceUrl}`);
+    const { filepath, filename } = saveAnalyzedData(sourceUrl, analyzedContent);
+
+    res.json({ success: true, filepath, filename });
+  } catch (error) {
+    console.error('[SAVE] Error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n🚀 Content Migration Server running on http://localhost:${PORT}`);
-  console.log(`   POST /api/discover - Discover sitemap`);
-  console.log(`   POST /api/scrape   - Scrape page content`);
-  console.log(`   POST /api/analyze  - Analyze content (AI)\n`);
+  console.log(`   POST /api/discover      - Discover sitemap`);
+  console.log(`   POST /api/scrape        - Scrape page content`);
+  console.log(`   POST /api/analyze       - Analyze content (AI)`);
+  console.log(`   POST /api/save-analysis - Save analyzed data\n`);
 });

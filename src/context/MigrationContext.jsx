@@ -359,12 +359,14 @@ Content: ${pageContent.bodyContent || ''}
                         title: aiAnalysis.improved.title || `${originalTitle} | Optimized`,
                         metaDescription: aiAnalysis.improved.metaDescription || originalMeta,
                         bodyContent: aiAnalysis.improved.bodyContent || originalBody,
-                        keywords: aiAnalysis.improved.keywords || []
+                        keywords: aiAnalysis.improved.keywords || [],
+                        hashtags: aiAnalysis.improved.hashtags || []
                     } : {
                         title: `${originalTitle} | Optimized`,
                         metaDescription: originalMeta || 'AI analysis unavailable',
                         bodyContent: originalBody,
-                        keywords: []
+                        keywords: [],
+                        hashtags: []
                     },
                     useOriginal: false // Default to AI improved version
                 }
@@ -372,6 +374,25 @@ Content: ${pageContent.bodyContent || ''}
 
             // Update state progressively so user sees results as they come
             setScrapedContent({ ...content })
+        }
+
+        // Save analyzed data to server
+        try {
+            console.log('💾 [SAVE] Saving analyzed data...')
+            const saveResponse = await fetch(`${API_BASE}/save-analysis`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    sourceUrl, 
+                    analyzedContent: content 
+                })
+            })
+            const saveData = await saveResponse.json()
+            if (saveData.success) {
+                console.log(`✅ [SAVE] Analyzed data saved to: ${saveData.filename}`)
+            }
+        } catch (saveError) {
+            console.error('⚠️ [SAVE] Failed to save analyzed data:', saveError)
         }
 
         setIsLoading(false)
